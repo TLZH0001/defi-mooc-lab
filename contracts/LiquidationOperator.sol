@@ -139,7 +139,7 @@ contract LiquidationOperator is IUniswapV2Callee {
     //    *** Your code here ***
     address target_address = 0x59CE4a2AC5bC3f5F225439B2993b86B42f6d3e9F;
     address me = address(this);
-    address AavePool = 0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9;
+    address AavePool = 0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
     address USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599; 
     address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;  
@@ -201,7 +201,7 @@ contract LiquidationOperator is IUniswapV2Callee {
 
         // 0. security checks and initializing variables
         //    *** Your code here ***
-        ILendingPool lending_pool = ILendingPool(0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9);
+        ILendingPool lending_pool = ILendingPool(AavePool);
         uint256 total_collatera_ETH = 0;
         uint256 total_debt_ETH = 0;
         uint256 avail_borrows_ETH = 0;
@@ -213,7 +213,7 @@ contract LiquidationOperator is IUniswapV2Callee {
         // order : WBTC, WETH, USDT
         address WETH_USDT_pair_address = factory.getPair(WETH, USDT);
         IUniswapV2Pair WETH_USDT_pair = IUniswapV2Pair(WETH_USDT_pair_address);
-        uint256 amt = 100000000000;
+        uint256 amt = 2040000000000;
 
         // 1. get the target user account data & make sure it is liquidatable
         //    *** Your code here ***
@@ -247,46 +247,50 @@ contract LiquidationOperator is IUniswapV2Callee {
 
         // 2.0. security checks and initializing variables
         //    *** Your code here ***
-        ILendingPool lending_pool = ILendingPool(0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9);
+        ILendingPool lending_pool = ILendingPool(AavePool);
         IERC20 usdt_tokken = IERC20(USDT);
         IERC20 wbtc_tokken = IERC20(WBTC);
         IERC20 weth_tokken = IERC20(WETH);
-        // order : WBTC, WETH, USDT
-
-        // 2.1 liquidate the target user
-        //    *** Your code here ***
-        usdt_tokken.approve(lending_pool, amount1);
-        lending_pool.liquidationCall(WBTC, USDT, target_address, amount1, false);
-       
-
-        // 2.2 swap WBTC for other things or repay directly
-        //    *** Your code here ***
         IUniswapV2Factory factory = IUniswapV2Factory(UniswapFactory);
+
+        // copy amount1 to avoind stack too deep
+        uint256 amt1_cpy = amount1;
+
         // order : WBTC, WETH, USDT
         address WBTC_WETH_pair_address = factory.getPair(WBTC, WETH);
         IUniswapV2Pair WBTC_WETH_pair = IUniswapV2Pair(WBTC_WETH_pair_address);
+        address WETH_USDT_pair_address = factory.getPair(WETH, USDT);
+        IUniswapV2Pair WETH_USDT_pair = IUniswapV2Pair(WETH_USDT_pair_address);
+        
 
+        // 2.1 liquidate the target user
+        //    *** Your code here ***
+        usdt_tokken.approve(AavePool, amt1_cpy);
+        lending_pool.liquidationCall(WBTC, USDT, target_address, amt1_cpy, false);
+        
+        // 2.2 swap WBTC for other things or repay directly
+        //    *** Your code here ***
+     
+        // order : WBTC, WETH, USDT
         uint256 my_wbtc = wbtc_tokken.balanceOf(me);
-        wbtc_tokken.approve(WBTC_WETH_pair_address, my_wbtc);
-        wbtc_tokken.transfer(WBTC_WETH_pair_address, my_wbtc);
-
         uint256 wbtc_reserved = 0;
         uint256 weth_reserved = 0;
         uint256 tblock = 0;
-        (wbtc_resrved, weth_reserved, tblock)= WBTC_WETH_pair.getReserves();
+        (wbtc_reserved, weth_reserved, tblock)= WBTC_WETH_pair.getReserves();
         uint256 amt = getAmountOut(my_wbtc, wbtc_reserved, weth_reserved);
+        wbtc_tokken.approve(WBTC_WETH_pair_address, my_wbtc);
+        wbtc_tokken.transfer(WBTC_WETH_pair_address, my_wbtc);
         WBTC_WETH_pair.swap(0, amt, me, "");
+    
 
         // 2.3 repay
         //    *** Your code here ***
         // order : WBTC, WETH, USDT
-        address WETH_USDT_pair_address = factory.getPair(WETH, USDT);
-        IUniswapV2Pair WETH_USDT_pair = IUniswapV2Pair(WETH_USDT_pair_address);
         uint256 weth_reserved2 = 0;
         uint256 usdt_reserved = 0;
         uint256 tblock2 = 0;
         (weth_reserved2, usdt_reserved, tblock2) = WETH_USDT_pair.getReserves();
-        uint256 weth_amt = getAmountIn(amount1, weth_reserved2, usdt_reserved);
+        uint256 weth_amt = getAmountIn(amt1_cpy, weth_reserved2, usdt_reserved);
         weth_tokken.approve(WETH_USDT_pair_address, weth_amt);
         weth_tokken.transfer(WETH_USDT_pair_address, weth_amt);
         // END TODO
